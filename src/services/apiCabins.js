@@ -10,3 +10,18 @@ export async function getCabins() {
 
   return cabins;
 }
+export async function createCabin(newCabin) {
+  const { data, error } = await supabase.from('cabins').insert([newCabin]);
+  if (error) {
+    throw new Error('Error occured while creating a cabin');
+  }
+  return data;
+}
+
+export async function deleteCabin(id) {
+  const { error } = await supabase.from('cabins').delete().eq('id', id);
+  if (error) {
+    throw new Error('Error occured while deleting a cabin');
+  }
+  return null;
+}
