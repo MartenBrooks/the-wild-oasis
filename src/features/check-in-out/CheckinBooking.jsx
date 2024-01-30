@@ -13,9 +13,11 @@ import Spinner from '../../ui/Spinner';
 import { useEffect, useState } from 'react';
 import Checkbox from '../../ui/Checkbox';
 import { formatCurrency } from '../../utils/helpers';
-import { useChecking } from './useChecking';
+import { useCheckIn } from './useCheckIn';
 import SpinnerMini from '../../ui/SpinnerMini';
 import { useSettings } from '../settings/useSettings';
+import Input from '../../ui/Input';
+import FormRow from '../../ui/FormRow';
 
 const Box = styled.div`
   /* Box */
@@ -28,7 +30,8 @@ const Box = styled.div`
 function CheckinBooking() {
   const [confirmPaid, setConfirmPaid] = useState(false);
   const [addBreakfast, setAddBreakfast] = useState(false);
-
+  const [breakfastCount, setBreakfastCount] = useState(0);
+  const [error, setError] = useState('');
   const { booking, isLoading } = useBooking();
   const { settings, isLoading: isLoadingSettings } = useSettings();
 
@@ -40,7 +43,7 @@ function CheckinBooking() {
   );
 
   const moveBack = useMoveBack();
-  const { checkin, isCheckingIn } = useChecking();
+  const { checkIn, isCheckingIn } = useCheckIn();
 
   if (isLoading || isLoadingSettings) return <Spinner />;
 
@@ -54,26 +57,38 @@ function CheckinBooking() {
   } = booking;
 
   const optionalBreakfastPrice =
-    settings?.breakfastPrice * numNights * numGuests || 0;
+    settings?.breakfastPrice * numNights * breakfastCount || 0;
 
   function handleCheckin() {
     if (!confirmPaid) return;
-    if (addBreakfast)
-      checkin({
+    if (addBreakfast) {
+      checkIn({
         bookingId,
         breakfast: {
           hasBreakfast: true,
           extraPrice: optionalBreakfastPrice,
           totalPrice: totalPrice + optionalBreakfastPrice,
+          breakfastCount,
         },
       });
-    else checkin(bookingId);
+    } else checkIn(bookingId);
   }
 
+  function handleConfirm() {
+    if (addBreakfast) {
+      if (breakfastCount < 1 || breakfastCount > numGuests) {
+        setError(`Number of breakfasts should be between 1 and ${numGuests}`);
+        return;
+      } else {
+        setError('');
+        setConfirmPaid((confirm) => !confirm);
+      }
+    }
+  }
   return (
     <>
-      <Row type='horizontal'>
-        <Heading as='h1'>Check in booking #{bookingId}</Heading>
+      <Row type="horizontal">
+        <Heading as="h1">Check in booking #{bookingId}</Heading>
         <ButtonText onClick={moveBack}>&larr; Back</ButtonText>
       </Row>
 
@@ -85,20 +100,41 @@ function CheckinBooking() {
             onChange={() => {
               setAddBreakfast((add) => !add);
               setConfirmPaid(false);
+              setBreakfastCount(0);
             }}
-            id='add-breakfast'
+            id="add-breakfast"
             disabled={isCheckingIn}
           >
-            Want to add breakfast for {formatCurrency(optionalBreakfastPrice)}?
+            Want to add breakfast for{' '}
+            {optionalBreakfastPrice === 0
+              ? `${formatCurrency(settings?.breakfastPrice)} per guest`
+              : formatCurrency(optionalBreakfastPrice)}
+            ?
           </Checkbox>
+          {addBreakfast && (
+            <FormRow
+              label="How many guests will have breakfast: "
+              error={error}
+            >
+              <Input
+                type="number"
+                id="breakfastCount"
+                value={breakfastCount}
+                onChange={(e) => setBreakfastCount(Number(e.target.value))}
+                disabled={confirmPaid}
+                min={1}
+                max={numGuests}
+              />
+            </FormRow>
+          )}
         </Box>
       )}
 
       <Box>
         <Checkbox
           checked={confirmPaid}
-          onChange={() => setConfirmPaid((c) => !c)}
-          id='confirm'
+          onChange={handleConfirm}
+          id="confirm"
           disabled={confirmPaid || isCheckingIn}
         >
           I confirm that {guests.fullName} has paid the total amount of{' '}
@@ -125,7 +161,10 @@ function CheckinBooking() {
         ) : (
           <SpinnerMini />
         )}
-        <Button variation='secondary' onClick={moveBack}>
+        <Button
+          variation="secondary"
+          onClick={moveBack}
+        >
           Back
         </Button>
       </ButtonGroup>
